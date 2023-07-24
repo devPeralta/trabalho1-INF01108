@@ -341,12 +341,11 @@ Wait:
 		rts		r7
 ;#############################################################################
 org _app
+
 		mov		#msg,r4
 		mov 	#0,r5	;area esquerda
-
 		;mov 	#1,r5	;area direita
 		;mov 	#5,r3
-		
 		jsr 	r7,putmsg	
 		;jmp 	loop
 
