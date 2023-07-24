@@ -1,0 +1,353 @@
+;******************************************************************************
+;
+;	Arquivo de Referencia para o desenvolvimento do kernel.
+;
+;	Versao: 2023.1
+;
+;	Areas de memoria
+;
+;	0000 - 7FFF		_KERNEL
+;					area de Kernel para implementacao dos alunos
+;
+;	0100 - 01FF		_VETTAB
+;					Tabela com os vetores das funcoes do kernel
+;					*** CUIDADO! Esse vetor esta no meio da area de codigo ***
+;
+;	8000 - FF7F		_APP
+;					Area onde sera colocado o programa de aplicacao.
+;					Esse programa vai fazer o acesso aos perifericos e interrupcoes, atraves das funcoes do Kernel.
+;
+;	FF80 - FFBF 	_IOAREA16
+;					Area de perifericos, acessada na base 16 bits
+;
+;	FFC0 - FFFF		_IOAREA08
+;					Area de perifericos, acessada na base 8 bits
+;					
+;******************************************************************************
+
+
+_KERNEL:	equ	h0000	
+_VETTAB:	equ	h0100			;tabela de vetores
+_RESET:		equ	_VETTAB+H0100	
+_APP:		equ	h8000			;programa de aplicacao
+_IOAREA16:	equ	hFF80			
+_IOAREA08:	equ	hFFC0			
+
+
+;
+;------------------------------------------------------------------------------
+;	Area reservada para os perifericos
+;------------------------------------------------------------------------------
+
+; Acesso em 16 bits
+		org		_IOAREA16
+	    daw		[31]
+IVET:	dw		0			; Vetor de interrupcao
+
+; Acesso em 8 bits
+		org		_IOAREA08
+		dab		[23]
+TIMDT:	db		0			; Registro de programacao do timer
+INTS:	db		0			; INTERRUPT STATUS: IP x x x . x x IPStec IPStim
+INTE:	db		0			; INTERRUPT ENABLE: IE x x x . x x IEStec IEStim
+TECST:	db		0			; Status do teclado
+TECDT:	db		0			; Dado do teclado
+VISOR:	dab		[36]		; Portas de acesso ao visor
+
+
+;		
+;------------------------------------------------------------------------------
+;	Ponto de entrada do RESET do processador
+;------------------------------------------------------------------------------
+		org		_KERNEL
+		jmp		_RESET
+
+;
+;------------------------------------------------------------------------------
+;	Area do kernel com os vetores das funcoes do kernel
+;------------------------------------------------------------------------------
+		org		_VETTAB
+		
+		dw		kbhit			; WORD	kbhit(void)
+		dw		getchar			; WORD	getchar(void)
+		dw		putchar			; WORD	putchar(WORD area, BYTE caractere)
+								; WORD	putchar(WORD area, BYTE caractere, WORD pos)
+		dw		putmsg			; WORD	putmsg(WORD area, BYTE *msg)
+								; WORD	putmsg(WORD area, BYTE *msg, WORD pos)
+		dw		startline		; WORD	startline(BYTE *buffer, WORD max)
+		dw		getline			; WORD	getline(WORD param)
+		
+;	
+;------------------------------------------------------------------------------
+;	Codigo de RESET (BOOT) do processador/interrupcao
+;------------------------------------------------------------------------------
+		org		_reset
+; 1) Desabilitar o sistema de interrupcoes
+		clr		ints
+		clr		inte
+; 2) Inicializar o stack pointer (SP = R6)
+		mov		#h7fff,r6
+; 3) Inicializar as variaveis internas usadas pelo sistema de interrupcoes e perifericos (IVET, INTE, etc.)
+		mov		#isr,ivet
+; 4) Inicializar as variaveis internas do kernel
+		
+; 5) Inicializar o teclado zerando o byte de estado (TECST, endereco 65498)
+		clr 	tecst
+; 6) Inicializar o timer
+		mov		#255,timdt
+; 7) Limpar o visor
+		jsr	r7,clrVisorEsq
+		jsr	r7,clrVisorDir
+; 8) Habilitar interrupcoes
+		mov 	#h83,inte				;TECLADO E TIMER
+; 9) Retornar para o programa de aplicacao com um desvio para o endereco _APP da memoria
+		jmp		_app
+
+;------------------------------------------------------------------------------
+;------------------------ VARIAVEIS INTERNAS DO KERNEL ------------------------
+;------------------------------------------------------------------------------
+tecBuffer:		dw	0
+cursor:			dw	0
+msg:			daw	'P','a','b','l','o','D','i','e','d','r','i','c','h','P','e','r','a','l','t','a','0','0','2','8','7','7','2','3',h00
+;
+;;------------------------------------------------------------------------------
+;;-------------------------------- INTERRUPCAO ---------------------------------
+;;------------------------------------------------------------------------------
+isr:
+		clr		inte
+		mov		r0,-(r6)	
+		mov		r1,-(r6)
+		mov		r2,-(r6)
+		mov		r3,-(r6)
+		mov		r4,-(r6)
+		mov		r5,-(r6)
+		
+		mov		ints,r3
+		asr		r3
+		bcs		isrTimer
+isrTimerFim:
+		asr		r3
+		bcs		isrTeclado
+		jmp		isrFimNoTecNoTim
+isrTimer:
+		;add		#5,65535
+		jmp		isrTimerFim
+isrTeclado:
+		mov		tecdt,tecBuffer
+		clr		tecdt
+		jmp		isrFim
+isrFimNoTecNoTim:
+		mov		#0,tecBuffer
+isrFim:	
+		clr		tecst
+		clr		ints
+		mov		(r6)+,r5	
+		mov		(r6)+,r4
+		mov		(r6)+,r3
+		mov		(r6)+,r2
+		mov		(r6)+,r1
+		mov		(r6)+,r0
+
+		mov 	#h83,inte				;TECLADO E TIMER
+		;mov 	#h82,inte				;TECLADO
+		;mov 	#h81,inte				;TIMER
+
+		rti
+;		
+;------------------------------------------------------------------------------
+; WORD	kbhit(void)		
+;------------------------------------------------------------------------------
+kbhit:
+		mov		#1,r0
+		tst		tecBuffer
+		beq		kbhitFim
+		mov		#0,r0
+	kbhitFim:
+		rts		r7
+;		
+;------------------------------------------------------------------------------
+; WORD	getchar(void)
+;------------------------------------------------------------------------------
+getchar:
+	getcharLoop:
+		jsr		r7,kbhit
+		tst		r0
+		bne		getcharLoop
+		mov		tecBuffer,r0
+		clr		tecBuffer
+		rts		r7
+;		
+;------------------------------------------------------------------------------
+; WORD	putchar(WORD area, BYTE caractere)
+; WORD	putchar(WORD area, BYTE caractere, WORD pos)
+;------------------------------------------------------------------------------
+putchar:
+	;bsp -> backspace
+	;lf  -> ctrl+enter
+	;ff  -> ctrl+L
+	;cr  -> enter
+			
+			mov		r1,-(r6)
+
+			mov		#visor,r1
+
+		;trata caracteres de controle
+			cmp		r4,#h08 ;bsp
+			beq		bspJmp
+			cmp		r4,#h0d ;cr
+			beq		crJmp
+			cmp		r4,#h0a ;lf
+			beq		lfJmp
+			cmp		r4,#h0c ;ff
+			beq		ffJmp
+			jmp		jmpCaracteresControle
+	bspJmp:
+			tst		cursor
+			beq		putcharFim
+			sub		#1,cursor
+			jmp		putcharFim
+	crJmp:
+			mov		#0,cursor
+			jmp		putcharFim
+	lfJmp:
+			jsr		r7,clrVisorEsq
+	ffJmp:
+			jsr		r7,clrVisorDir
+
+	jmpCaracteresControle:
+		;verifica se caractere esta entre h20 e h7a
+			cmp		r4,#h20
+			blt		putcharFimErro
+			cmp		r4,#h7a
+			bgt		putcharFimErro
+
+			tst		r5
+			beq		areaEsq
+			jmp		areaDir
+
+	areaEsq:
+			cmp		cursor,#24
+			beq		putcharFimErro
+			add		cursor,r1
+			mov		r4,(r1)
+			add		#1,cursor
+			jmp		putcharFim
+	areaDir:
+			cmp		r3,#0
+			blt		putcharFimErro
+			cmp		r3,#11
+			bgt		putcharFimErro
+			add		#24,r1
+			add		r3,r1
+			mov		r4,(r1)
+			jmp		putcharFim
+
+	putcharFimErro:
+			mov		#1,r0
+	putcharFim:
+			mov		#0,r0
+			mov		(r6)+,r1
+			rts		r7
+
+;		
+;------------------------------------------------------------------------------
+; WORD	putmsg(WORD area, BYTE *msg)
+; WORD	putmsg(WORD area, BYTE *msg, WORD pos)
+;------------------------------------------------------------------------------
+putmsg:
+		mov		r1,-(r6)
+		mov		r4,r1
+
+	putmsgLoop:
+		
+		mov		(r1)+,r4	
+		cmp		r4,#h00
+		beq		putmsgFim
+		jsr		r7,putchar
+		cmp		r0,#1
+		beq		putmsgFim
+		jmp		putmsgLoop
+
+
+	putmsgFim:
+		mov		(r6)+,r1
+		rts		r7
+
+;		
+;------------------------------------------------------------------------------
+; WORD	startline(BYTE *buffer, WORD max)
+;------------------------------------------------------------------------------
+startline:
+
+
+		rts		r7
+				
+;		
+;------------------------------------------------------------------------------
+; WORD	getline(WORD param)
+;------------------------------------------------------------------------------
+getline:
+		rts		r7
+;#############################################################################
+clrVisorEsq:
+		mov		' ',65500
+		mov		' ',65501
+		mov		' ',65502
+		mov		' ',65503
+		mov		' ',65504
+		mov		' ',65505
+		mov		' ',65506
+		mov		' ',65507
+		mov		' ',65508
+		mov		' ',65509
+		mov		' ',65510
+		mov		' ',65511
+		mov		' ',65512
+		mov		' ',65513
+		mov		' ',65514
+		mov		' ',65515
+		mov		' ',65516
+		mov		' ',65517
+		mov		' ',65518
+		mov		' ',65519
+		mov		' ',65520
+		mov		' ',65521
+		mov		' ',65522
+		mov		' ',65523
+		rts 	r7
+;#############################################################################
+clrVisorDir:
+		mov		' ',65524
+		mov		' ',65525
+		mov		' ',65526
+		mov		' ',65527
+		mov		' ',65528
+		mov		' ',65529
+		mov		' ',65530
+		mov		' ',65531
+		mov		' ',65532
+		mov		' ',65533
+		mov		' ',65534
+		mov		' ',65535
+		rts 	r7
+;#############################################################################
+Wait:
+		mov		#10,r0
+	WaitLoopR0:
+		mov		#30000,r1
+	WaitLoopR1:
+		sob		r1,WaitLoopR1
+		sob		r0,WaitLoopR0
+		rts		r7
+;#############################################################################
+org _app
+		mov		#msg,r4
+		mov 	#0,r5	;area esquerda
+
+		;mov 	#1,r5	;area direita
+		;mov 	#5,r3
+		
+		jsr 	r7,putmsg	
+		;jmp 	loop
+
+		hlt
