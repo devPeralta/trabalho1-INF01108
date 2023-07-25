@@ -342,10 +342,8 @@ Wait:
 org _app
 
 loop:
-		jsr		r7,kbhit
-		tst		r0
-		bne		loop
-		mov		tecBuffer,65500
+		jsr		r7,getchar
+		mov		r0,65500
 		jmp		loop
 
 		hlt
