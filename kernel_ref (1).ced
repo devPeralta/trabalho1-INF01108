@@ -33,7 +33,6 @@ _APP:		equ	h8000			;programa de aplicacao
 _IOAREA16:	equ	hFF80			
 _IOAREA08:	equ	hFFC0			
 
-
 ;
 ;------------------------------------------------------------------------------
 ;	Area reservada para os perifericos
@@ -342,11 +341,11 @@ Wait:
 ;#############################################################################
 org _app
 
-		mov		#msg,r4
-		mov 	#0,r5	;area esquerda
-		;mov 	#1,r5	;area direita
-		;mov 	#5,r3
-		jsr 	r7,putmsg	
-		;jmp 	loop
+loop:
+		jsr		r7,kbhit
+		tst		r0
+		bne		loop
+		mov		tecBuffer,65500
+		jmp		loop
 
 		hlt

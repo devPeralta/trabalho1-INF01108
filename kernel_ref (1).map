@@ -46,3 +46,4 @@ CLRVISORDIR              1058                 422
 WAIT                     1131                 46B
 WAITLOOPR0               1135                 46F
 WAITLOOPR1               1139                 473
+LOOP                    32768                8000
