@@ -108,6 +108,9 @@ VISOR:	dab		[36]		; Portas de acesso ao visor
 tecBuffer:		dw	0
 cursor:			dw	0
 msg:			daw	'P','a','b','l','o','D','i','e','d','r','i','c','h','P','e','r','a','l','t','a','0','0','2','8','7','7','2','3',h00
+startlineFlag:	db	0
+startlineBuffer:dab	[25]
+startlineMax:	db  5
 ;
 ;;------------------------------------------------------------------------------
 ;;-------------------------------- INTERRUPCAO ---------------------------------
@@ -132,7 +135,20 @@ isrTimer:
 		;add		#5,65535
 		jmp		isrTimerFim
 isrTeclado:
+		mov		startlineFlag,r1
+		tst		r1
+		bne		startlineOn
 		mov		tecdt,tecBuffer
+		clr		tecdt
+		jmp		isrFim
+startlineOn:
+		mov		#visor,r2
+		add		cursor,r2
+		cmp		r2,#65524
+		beq		startlineOnFim
+		add		#1,cursor
+		mov		tecdt,(r2)+
+startlineOnFim:
 		clr		tecdt
 		jmp		isrFim
 isrFimNoTecNoTim:
@@ -277,10 +293,10 @@ putmsg:
 ; WORD	startline(BYTE *buffer, WORD max)
 ;------------------------------------------------------------------------------
 startline:
-
+		mov		#1,startlineFlag
 
 		rts		r7
-				
+
 ;		
 ;------------------------------------------------------------------------------
 ; WORD	getline(WORD param)
@@ -341,13 +357,12 @@ Wait:
 ;#############################################################################
 org _app
 
+		mov		#startlineBuffer,r5		;move endereço do buffer para r5
+		mov		startlineMax,r4			;move tamanho maximo do buffer para r4
+		jsr		r7,startline
 loop:
-		jsr		r7,getchar
-		mov		r0,r4		;caractere em r4
-;		mov		#0,r5		;r5 == 0 -> area esquerda
-		mov		#1,r5		;r5 != 0 -> area direita
-		mov		#4,r3		;posicao do caractere (apenas para area direita)
-		jsr		r7,putchar
-		jmp		loop
+		
 
+
+		jmp		loop
 		hlt

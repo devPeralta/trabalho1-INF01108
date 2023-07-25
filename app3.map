@@ -1,0 +1,27 @@
+Símbolo         Valor Decimal   Valor Hexadecimal
+-------         -------------   -----------------
+_VETTAB                   256                 100
+_APP                    32768                8000
+AREA_ESQUERDA               0                   0
+AREA_DIREITA                1                   1
+PARAM_RESET                 0                   0
+PARAM_FINISHED              1                   1
+PARAM_TIME                  2                   2
+PARAM_BUFFER                3                   3
+PARAM_SIZE                  4                   4
+MINV                       32                  20
+MAXV                      126                  7E
+FF                         12                   C
+CR                         13                   D
+LF                         10                   A
+LOOP                    32768                8000
+MSG1                    32830                803E
+MSG2                    32841                8049
+MSG3                    32851                8053
+MSG4                    32854                8056
+KBHIT                   32856                8058
+GETCHAR                 32864                8060
+PUTCHAR                 32872                8068
+PUTMSG                  32880                8070
+STARTLINE               32888                8078
+GETLINE                 32896                8080
