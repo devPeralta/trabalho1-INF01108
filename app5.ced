@@ -43,7 +43,6 @@ BS:				equ		H08
 	org		_APP
 		
 ;------------------------------------------------------------------------------
-
 loop:
 	mov		#AREA_ESQUERDA,r5		; limpa a area esquerda
 	mov		#CR,r4

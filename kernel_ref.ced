@@ -106,11 +106,12 @@ VISOR:	dab		[36]		; Portas de acesso ao visor
 ;------------------------ VARIAVEIS INTERNAS DO KERNEL ------------------------
 ;------------------------------------------------------------------------------
 tecBuffer:		dw	0
-cursor:			dw	0
+cursor:			db	0
 msg:			daw	'P','a','b','l','o','D','i','e','d','r','i','c','h','P','e','r','a','l','t','a','0','0','2','8','7','7','2','3',h00
 startlineFlag:	db	0
 startlineBuffer:dab	[25]
-startlineMax:	db  5
+startlineMax:	dw  0
+getlineParam:	dw	0
 ;
 ;;------------------------------------------------------------------------------
 ;;-------------------------------- INTERRUPCAO ---------------------------------
@@ -147,6 +148,17 @@ startlineOn:
 		cmp		r2,#65524
 		beq		startlineOnFim
 		add		#1,cursor
+		cmp		tecdt,#h0d
+		bne		startlineInsere
+		mov		#0,startlineFlag
+		jmp		startlineOnFim
+	startlineInsere:
+		cmp		tecdt,#8
+		bne		startlineInsereChar
+		dec		r2
+		mov		#h20,(r2)
+		sub		#2,cursor
+	startlineInsereChar:
 		mov		tecdt,(r2)+
 startlineOnFim:
 		clr		tecdt
@@ -293,6 +305,7 @@ putmsg:
 ; WORD	startline(BYTE *buffer, WORD max)
 ;------------------------------------------------------------------------------
 startline:
+		mov		r4,startlineMax
 		mov		#1,startlineFlag
 
 		rts		r7
@@ -302,6 +315,40 @@ startline:
 ; WORD	getline(WORD param)
 ;------------------------------------------------------------------------------
 getline:
+		mov		r1,-(r6)
+		mov		r2,-(r6)
+
+		cmp		r5,#0				;r5 == param_reset ?
+		bne		getlineJmp1
+		mov		startlineFlag,r1
+		tst		r1
+		beq		getlineErro
+		;param_reset inicio
+		mov		#0,startlineFlag
+		jmp		getlineFim
+
+getlineJmp1:
+		cmp		r5,#1				;r5 == param_finished ?
+		bne		getlineJmp2
+		mov		cursor,r2
+		cmp		r2,startlineMax
+		beq		getlineFim			;jmp se string chegou a max
+		cmp		startlineFlag,#0
+		beq		getlineFim			;jmp se caractere é igual a H0D (enter)
+		jmp		getlineErro
+getlineJmp2:
+
+
+getlineErro:
+		mov		(r6)+,r2
+		mov		(r6)+,r1
+		mov		#65535,r0
+		rts		r7
+getlineFim:
+		mov		#0,startlineFlag
+		mov		(r6)+,r2
+		mov		(r6)+,r1
+		mov		#0,r0
 		rts		r7
 ;#############################################################################
 clrVisorEsq:
@@ -358,11 +405,18 @@ Wait:
 org _app
 
 		mov		#startlineBuffer,r5		;move endereço do buffer para r5
-		mov		startlineMax,r4			;move tamanho maximo do buffer para r4
+		mov		#11,r4					;move tamanho maximo do buffer para r4
 		jsr		r7,startline
-loop:
-		
+loop:	
+	;finaliza entrada da string
+		;mov		#0,r5
+		;jsr		r7,getline
 
+	;testa se encerrou a entrada da string
+		mov		#1,r5
+		jsr		r7,getline
+		tst		r0
+		beq		fim
 
 		jmp		loop
-		hlt
+fim:	hlt
