@@ -105,15 +105,16 @@ VISOR:	dab		[36]		; Portas de acesso ao visor
 ;------------------------------------------------------------------------------
 ;------------------------ VARIAVEIS INTERNAS DO KERNEL ------------------------
 ;------------------------------------------------------------------------------
-tecBuffer:		dw	0
-cursor:			db	4
+tecBuffer:		db	0
+cursor:			dw	0
 
 msg:			daw		'P','a','b','l','o','D','i','e','d','r','i','c','h','P','e','r','a','l','t','a','0','0','2','8','7','7','2','3',h00
 msg1:			dab		CR, LF, 'putmsg-E', 0
 msg2:			dab		FF, 'putmsg-D', 0
 msg3:			dab		CR, LF, 0
 msg4:			dab		FF, 0
-msg5:			dab		'teste 123! Pablo Diedrich Peralta', 0
+msg5:			dab		'area esquerda funcionando',CR,LF,'CR e LF tambem', 0
+msg6:			dab		'direita ok!',FF,'teste final!',0
 
 startlineFlag:	db	0
 startlineBuffer:dab	[25]
@@ -278,6 +279,7 @@ putchar:
 			add		#24,r1
 			add		r3,r1
 			mov		r4,(r1)
+			add		#1,r3
 			jmp		putcharFim
 
 	putcharFimErro:
@@ -295,53 +297,21 @@ putchar:
 putmsg:
 		mov		r1,-(r6)
 		mov		r4,r1
+		dec		r1
 
 	putmsgLoop:
-		
-		mov		-1(r1),r4	
+		mov		(r1),r4
 		inc		r1
-		cmp		r4,#h00
+		and		#hff,r4
+		cmp		r4,#0
 		beq		putmsgFim
 		jsr		r7,putchar
-		cmp		r0,#1
-		beq		putmsgFim
 		jmp		putmsgLoop
-
 
 	putmsgFim:
 		mov		(r6)+,r1
 		rts		r7
-;		
-;------------------------------------------------------------------------------
-; WORD	startline(BYTE *buffer, WORD max)
-;------------------------------------------------------------------------------
-putmsg2:	
-		mov		r1,-(r6)
-		mov		r2,-(r6)
-
-		mov		#visor,r1
-		tst		r5
-		beq		putmsgEsq
-
-	putmsgDir:
-	putmsgEsq:
-		mov		-1(r4),(r1)
-		
-		cmp		(r1),#0
-		beq		putmsg2Fim
-		cmp		r1,#65523
-		beq		putmsg2Fim
-
-		inc		r1
-		inc		r4
-		
-		jmp		putmsgEsq
-
-putmsg2Fim:
-		mov		(r6)+,r2
-		mov		(r6)+,r1
-		rts		r7
-;		
+;
 ;------------------------------------------------------------------------------
 ; WORD	startline(BYTE *buffer, WORD max)
 ;------------------------------------------------------------------------------
@@ -447,9 +417,12 @@ org _app
 
 		mov		#msg5,r4
 		mov 	#0,r5	;area esquerda
-		;mov 	#1,r5	;area direita
-		;mov 	#5,r3
-		jsr 	r7,putmsg2
+		jsr 	r7,putmsg
+
+		mov		#msg6,r4
+		mov 	#1,r5	;area direita
+		mov 	#5,r3
+		jsr		r7,putmsg
 		;jmp 	loop
 
 		hlt
