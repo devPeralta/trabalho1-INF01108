@@ -67,3 +67,6 @@ CLRVISORDIR              1353                 549
 WAIT                     1426                 592
 WAITLOOPR0               1430                 596
 WAITLOOPR1               1434                 59A
+LOOPMAIN                32768                8000
+LOOP                    32804                8024
+FIM                     32820                8034

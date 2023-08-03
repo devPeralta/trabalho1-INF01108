@@ -415,14 +415,31 @@ Wait:
 ;#############################################################################
 org _app
 
-		mov		#msg5,r4
-		mov 	#0,r5	;area esquerda
-		jsr 	r7,putmsg
+	loopMain:
+	;;limpa area esquerda
+		mov		#0,r5		
+		mov		#H0D,r4
+		jsr		r7,putchar
+		mov		#0,r5
+		mov		#H0A,r4
+		jsr		r7,putchar
+		
+	;;	
+		mov		#startlineBuffer,r5
+		mov		#11,r4					;move tamanho maximo do buffer para r4
+		jsr		r7,startline
+	loop:
 
-		mov		#msg6,r4
-		mov 	#1,r5	;area direita
-		mov 	#5,r3
-		jsr		r7,putmsg
-		;jmp 	loop
+	;;finaliza entrada da string
+			;mov		#0,r5
+			;jsr		r7,getline
 
-		hlt
+	;;testa se encerrou a entrada da string
+		mov		#1,r5
+		jsr		r7,getline
+		tst		r0
+		beq		fim
+
+		jmp		loop
+
+fim:	hlt
