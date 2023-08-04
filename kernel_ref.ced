@@ -93,7 +93,7 @@ VISOR:	dab		[36]		; Portas de acesso ao visor
 ; 5) Inicializar o teclado zerando o byte de estado (TECST, endereco 65498)
 		clr 	tecst
 ; 6) Inicializar o timer
-		mov		#255,timdt
+		mov		#10,timdt
 ; 7) Limpar o visor
 		jsr	r7,clrVisorEsq
 		jsr	r7,clrVisorDir
@@ -120,6 +120,7 @@ startlineFlag:	db	0
 startlineBuffer:dab	[25]
 startlineMax:	dw  0
 getlineParam:	dw	0
+startlineTimer:	dw	0
 
 FF:				equ		H0C
 CR:				equ		H0D
@@ -145,7 +146,12 @@ isrTimerFim:
 		bcs		isrTeclado
 		jmp		isrFimNoTecNoTim
 isrTimer:
-		;add		#5,65535
+		;add	#5,65535
+		mov		startlineFlag,r1
+		tst		r1
+		beq		isrTimerFim
+		;add		#1,startlineTimer
+		add		#1,startlineTimer
 		jmp		isrTimerFim
 isrTeclado:
 		mov		startlineFlag,r1
@@ -348,9 +354,17 @@ getline:
 		beq		getlineFim			;jmp se caractere é igual a H0D (enter)
 		jmp		getlineErro
 	getlineJmp2:
-	;;r5 == param_size ?
-
-
+	;;r5 == param_time ?
+		cmp		r5,#2	
+		bne		getlineJmp3
+		mov		startlineTimer,r0
+		mov		(r6)+,r2
+		mov		(r6)+,r1
+		rts		r7
+	getlineJmp3:
+		mov		(r6)+,r2
+		mov		(r6)+,r1
+		rts		r7
 	getlineErro:
 		mov		(r6)+,r2
 		mov		(r6)+,r1
@@ -439,12 +453,16 @@ org _app
 		;jsr		r7,getline
 		;pula:
 	;;testa se encerrou a entrada da string - param_finished(1)
-		mov		#1,r5
-		jsr		r7,getline
-		tst		r0
-		beq		fim
-			
-
-		jmp		loop
+		;mov		#1,r5
+		;jsr		r7,getline
+		;tst		r0
+		;beq		fim
+	;;teste timer
+		;mov 	#2,r5
+		;jsr 	r7,getline
+		;cmp		r0,#600
+		;bne		loop
+		
+		;jmp		loop
 
 fim:	hlt
