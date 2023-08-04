@@ -113,11 +113,12 @@ msg1:			dab		CR, LF, 'putmsg-E', 0
 msg2:			dab		FF, 'putmsg-D', 0
 msg3:			dab		CR, LF, 0
 msg4:			dab		FF, 0
-msg5:			dab		'area esquerda funcionando',CR,LF,'CR e LF tambem', 0
-msg6:			dab		'direita ok!',FF,'teste final!',0
+msg5:			dab		'okok',CR,LF,'CR e LF tambem', 0
+msg6:			dab		'ok',FF,'teste final!',0
 
 startlineFlag:	db	0
 startlineBuffer:dab	[25]
+bufferPos:		db  0	;;;;;;;;;;;;;;;
 startlineMax:	dw  0
 getlineParam:	dw	0
 startlineTimer:	dw	0
@@ -146,11 +147,9 @@ isrTimerFim:
 		bcs		isrTeclado
 		jmp		isrFimNoTecNoTim
 isrTimer:
-		;add	#5,65535
 		mov		startlineFlag,r1
 		tst		r1
 		beq		isrTimerFim
-		;add		#1,startlineTimer
 		add		#1,startlineTimer
 		jmp		isrTimerFim
 isrTeclado:
@@ -161,13 +160,18 @@ isrTeclado:
 		clr		tecdt
 		jmp		isrFim
 startlineOn:
+		mov		#startlineBuffer,r5
+
 		mov		#visor,r2
 		add		cursor,r2
 		cmp		r2,#65524
 		beq		startlineOnFim
+		cmp		cursor,startlineMax
+		beq		startlineOff 
 		add		#1,cursor
 		cmp		tecdt,#h0d
 		bne		startlineInsere
+	startlineOff:
 		mov		#0,startlineFlag
 		jmp		startlineOnFim
 	startlineInsere:
@@ -177,7 +181,10 @@ startlineOn:
 		mov		#h20,(r2)
 		sub		#2,cursor
 	startlineInsereChar:
-		mov		tecdt,(r2)+
+		mov		tecdt,(r2)
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;DÁ BUG AQUI
+		;mov		tecdt,bufferPos(r5)
+		;add		#1,bufferPos
 startlineOnFim:
 		clr		tecdt
 		jmp		isrFim
@@ -256,8 +263,10 @@ putchar:
 			jmp		putcharFim
 	lfJmp:
 			jsr		r7,clrVisorEsq
+			jmp		putcharFim
 	ffJmp:
 			jsr		r7,clrVisorDir
+			jmp		putcharFim
 
 	jmpCaracteresControle:
 		;verifica se caractere esta entre h20 e h7a
@@ -347,12 +356,16 @@ getline:
 	;;r5 == param_finished ?
 		cmp		r5,#1				
 		bne		getlineJmp2
-		mov		cursor,r2
-		cmp		r2,startlineMax
-		beq		getlineFim			;jmp se string chegou a max
 		cmp		startlineFlag,#0
-		beq		getlineFim			;jmp se caractere é igual a H0D (enter)
+		beq		getlineFim
 		jmp		getlineErro
+
+		;mov		cursor,r2
+		;cmp		r2,startlineMax
+		;beq		getlineFim			;jmp se string chegou a max
+		;cmp		startlineFlag,#0
+		;beq		getlineFim			;jmp se caractere é igual a H0D (enter)
+		;jmp		getlineErro
 	getlineJmp2:
 	;;r5 == param_time ?
 		cmp		r5,#2	
@@ -371,7 +384,7 @@ getline:
 		mov		#65535,r0
 		rts		r7
 	getlineFim:
-		mov		#0,startlineFlag
+		;mov	#0,startlineFlag
 		mov		(r6)+,r2
 		mov		(r6)+,r1
 		mov		#0,r0
@@ -461,8 +474,19 @@ org _app
 		;mov 	#2,r5
 		;jsr 	r7,getline
 		;cmp		r0,#600
-		;bne		loop
+		;beq		fim
+	
 		
-		;jmp		loop
+		jmp		loop
 
-fim:	hlt
+fim:	
+		mov		#msg5,r4
+		mov 	#0,r5	
+		jsr 	r7,putmsg
+
+		mov		#msg6,r4
+		mov 	#1,r5	;area direita
+		mov 	#0,r3
+		jsr		r7,putmsg
+
+hlt
