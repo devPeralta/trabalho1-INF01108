@@ -443,9 +443,7 @@ org _app
 		jsr		r7,getline
 		tst		r0
 		beq		fim
-	
-
-		
+			
 
 		jmp		loop
 
