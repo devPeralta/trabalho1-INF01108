@@ -316,11 +316,10 @@ putmsg:
 ; WORD	startline(BYTE *buffer, WORD max)
 ;------------------------------------------------------------------------------
 startline:
-		mov		r4,startlineMax
-		mov		#1,startlineFlag
+		mov		r4,startlineMax		
+		mov		#1,startlineFlag	;ativa startline
 
 		rts		r7
-
 ;		
 ;------------------------------------------------------------------------------
 ; WORD	getline(WORD param)
@@ -329,17 +328,18 @@ getline:
 		mov		r1,-(r6)
 		mov		r2,-(r6)
 
-		cmp		r5,#0				;r5 == param_reset ?
+	;;r5 == param_reset ?
+		cmp		r5,#0				
 		bne		getlineJmp1
 		mov		startlineFlag,r1
 		tst		r1
 		beq		getlineErro
-		;param_reset inicio
 		mov		#0,startlineFlag
 		jmp		getlineFim
 
-getlineJmp1:
-		cmp		r5,#1				;r5 == param_finished ?
+	getlineJmp1:
+	;;r5 == param_finished ?
+		cmp		r5,#1				
 		bne		getlineJmp2
 		mov		cursor,r2
 		cmp		r2,startlineMax
@@ -347,15 +347,16 @@ getlineJmp1:
 		cmp		startlineFlag,#0
 		beq		getlineFim			;jmp se caractere é igual a H0D (enter)
 		jmp		getlineErro
-getlineJmp2:
+	getlineJmp2:
+	;;r5 == param_size ?
 
 
-getlineErro:
+	getlineErro:
 		mov		(r6)+,r2
 		mov		(r6)+,r1
 		mov		#65535,r0
 		rts		r7
-getlineFim:
+	getlineFim:
 		mov		#0,startlineFlag
 		mov		(r6)+,r2
 		mov		(r6)+,r1
@@ -423,22 +424,28 @@ org _app
 		mov		#0,r5
 		mov		#H0A,r4
 		jsr		r7,putchar
-		
-	;;	
+	
+	;;inicializa e executa startline
 		mov		#startlineBuffer,r5
-		mov		#11,r4					;move tamanho maximo do buffer para r4
+		mov		#11,r4					;tamanho maximo do buffer
 		jsr		r7,startline
+	
 	loop:
 
-	;;finaliza entrada da string
-			;mov		#0,r5
-			;jsr		r7,getline
-
-	;;testa se encerrou a entrada da string
+	;;finaliza entrada da string - param_reset(0)
+		;cmp		cursor,#5
+		;bne		pula
+		;mov		#0,r5
+		;jsr		r7,getline
+		;pula:
+	;;testa se encerrou a entrada da string - param_finished(1)
 		mov		#1,r5
 		jsr		r7,getline
 		tst		r0
 		beq		fim
+	
+
+		
 
 		jmp		loop
 
