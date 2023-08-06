@@ -117,11 +117,12 @@ msg5:			dab		'okok',CR,LF,'CR e LF tambem', 0
 msg6:			dab		'ok',FF,'teste final!',0
 
 startlineFlag:	db	0
-startlineBuffer:dab	[25]
-bufferPos:		db  0	;;;;;;;;;;;;;;;
+slBuf:			dab	[25]
+bufferPos:		db  0
 startlineMax:	dw  0
 getlineParam:	dw	0
 startlineTimer:	dw	0
+startlineSize:	dw	0
 
 FF:				equ		H0C
 CR:				equ		H0D
@@ -160,8 +161,10 @@ isrTeclado:
 		clr		tecdt
 		jmp		isrFim
 startlineOn:
-		mov		#startlineBuffer,r5
-
+;;;;;;;;
+		;mov		#slBuf,r5
+		;add		bufferPos,r5z
+;;;;;;;;
 		mov		#visor,r2
 		add		cursor,r2
 		cmp		r2,#65524
@@ -172,19 +175,30 @@ startlineOn:
 		cmp		tecdt,#h0d
 		bne		startlineInsere
 	startlineOff:
+		;cmp		tecdt,#8
+		;beq		startlineInsere
 		mov		#0,startlineFlag
 		jmp		startlineOnFim
 	startlineInsere:
 		cmp		tecdt,#8
 		bne		startlineInsereChar
+		;char é bsp
+		cmp		startlineSize,#0
+		bne		sizeNotZero
+		mov		#0,cursor
+		jmp		startlineOnFim
+	sizeNotZero:
+		sub		#1,startlineSize
 		dec		r2
 		mov		#h20,(r2)
 		sub		#2,cursor
+		jmp		startlineOnFim
 	startlineInsereChar:
 		mov		tecdt,(r2)
-	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;DÁ BUG AQUI
-		;mov		tecdt,bufferPos(r5)
-		;add		#1,bufferPos
+		add		#1,startlineSize
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;TENTANDO IMPLEMENTAR PARAM_BUFFER
+		;mov		#'p',(r5)
+		;add		#2,bufferPos
 startlineOnFim:
 		clr		tecdt
 		jmp		isrFim
@@ -334,6 +348,8 @@ startline:
 		mov		r4,startlineMax		
 		mov		#1,startlineFlag	;ativa startline
 
+		mov		#0,startlineSize
+
 		rts		r7
 ;		
 ;------------------------------------------------------------------------------
@@ -375,6 +391,18 @@ getline:
 		mov		(r6)+,r1
 		rts		r7
 	getlineJmp3:
+	;;r5 == param_buffer ?
+		cmp		r5,#3	
+		bne		getlineJmp4
+		mov		#slBuf,r0
+		mov		(r6)+,r2
+		mov		(r6)+,r1
+		rts		r7
+	getlineJmp4:
+	;;r5 == param_size
+		cmp		r5,#4
+		bne		getlineErro
+		mov		startlineSize,r0
 		mov		(r6)+,r2
 		mov		(r6)+,r1
 		rts		r7
@@ -441,52 +469,4 @@ Wait:
 		sob		r0,WaitLoopR0
 		rts		r7
 ;#############################################################################
-org _app
 
-	loopMain:
-	;;limpa area esquerda
-		mov		#0,r5		
-		mov		#H0D,r4
-		jsr		r7,putchar
-		mov		#0,r5
-		mov		#H0A,r4
-		jsr		r7,putchar
-	
-	;;inicializa e executa startline
-		mov		#startlineBuffer,r5
-		mov		#11,r4					;tamanho maximo do buffer
-		jsr		r7,startline
-	
-	loop:
-
-	;;finaliza entrada da string - param_reset(0)
-		;cmp		cursor,#5
-		;bne		pula
-		;mov		#0,r5
-		;jsr		r7,getline
-		;pula:
-	;;testa se encerrou a entrada da string - param_finished(1)
-		;mov		#1,r5
-		;jsr		r7,getline
-		;tst		r0
-		;beq		fim
-	;;teste timer
-		;mov 	#2,r5
-		;jsr 	r7,getline
-		;cmp		r0,#600
-		;beq		fim
-	
-		
-		jmp		loop
-
-fim:	
-		mov		#msg5,r4
-		mov 	#0,r5	
-		jsr 	r7,putmsg
-
-		mov		#msg6,r4
-		mov 	#1,r5	;area direita
-		mov 	#0,r3
-		jsr		r7,putmsg
-
-hlt

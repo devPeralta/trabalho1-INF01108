@@ -52,7 +52,7 @@ loop:
 	jsr		r7,putchar
 
 	mov		#buffer,r5				; inicia a entrada de string
-	mov		#5,r4
+	mov		#10,r4
 	jsr		r7,startline
 	
 loop1:
