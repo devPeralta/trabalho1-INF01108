@@ -105,33 +105,34 @@ VISOR:	dab		[36]		; Portas de acesso ao visor
 ;------------------------------------------------------------------------------
 ;------------------------ VARIAVEIS INTERNAS DO KERNEL ------------------------
 ;------------------------------------------------------------------------------
-tecBuffer:		db	0
-cursor:			dw	0
+tecBuffer:		db	0			;variavel para armazenar tecdt fora da interrupcao
+cursor:			dw	0			;cursor para percorrer visor
 
-msg:			daw		'P','a','b','l','o','D','i','e','d','r','i','c','h','P','e','r','a','l','t','a','0','0','2','8','7','7','2','3',h00
-msg1:			dab		CR, LF, 'putmsg-E', 0
-msg2:			dab		FF, 'putmsg-D', 0
-msg3:			dab		CR, LF, 0
-msg4:			dab		FF, 0
-msg5:			dab		'okok',CR,LF,'CR e LF tambem', 0
-msg6:			dab		'ok',FF,'teste final!',0
+;msg:			daw		'P','a','b','l','o','D','i','e','d','r','i','c','h','P','e','r','a','l','t','a','0','0','2','8','7','7','2','3',0
+;msg1:			dab		CR, LF, 'putmsg-E', 0
+;msg2:			dab		FF, 'putmsg-D', 0
+;msg3:			dab		CR, LF, 0
+;msg4:			dab		FF, 0
+;msg5:			dab		'okok',CR,LF,'teste', 0
+;msg6:			dab		'ok',FF,'2teste',0
 
-startlineFlag:	db	0
-slBuf:			dab	[25]
-bufferPos:		db  0
-startlineMax:	dw  0
-getlineParam:	dw	0
-startlineTimer:	dw	0
-startlineSize:	dw	0
+startlineFlag:	db	0			;variavel que sinaliza se startline está ligada ou desligada
+slBuf:			dab	[25]		;vetor que armazena a string de startline inserida no visor [não implementado]
+bufferPos:		db  0			;posicao para percorrer slBuf [não implementado]
+startlineMax:	dw  0			;maximo de caracteres em startline
+getlineParam:	dw	0			;indice do parametro da funcao getline
+startlineTimer:	dw	0			;representa timer do startline
+startlineSize:	dw	0			;representa tamanho do buffer de startline
 
-FF:				equ		H0C
-CR:				equ		H0D
-LF:				equ		H0A
+FF:				equ		H0C		;form feed
+CR:				equ		H0D		;carriage return
+LF:				equ		H0A		;line feed
 ;
 ;;------------------------------------------------------------------------------
 ;;-------------------------------- INTERRUPCAO ---------------------------------
 ;;------------------------------------------------------------------------------
 isr:
+	;;desativa interrupcao e salva todos registradores na pilha
 		clr		inte
 		mov		r0,-(r6)	
 		mov		r1,-(r6)
@@ -139,21 +140,24 @@ isr:
 		mov		r3,-(r6)
 		mov		r4,-(r6)
 		mov		r5,-(r6)
-		
+	;;verifica se é interrupcao do timer
 		mov		ints,r3
 		asr		r3
 		bcs		isrTimer
 isrTimerFim:
+	;;verifica se é interrupcao do teclado
 		asr		r3
 		bcs		isrTeclado
 		jmp		isrFimNoTecNoTim
 isrTimer:
+	;;testa se startline está ativo, se estiver ativo incrementa timer de startline
 		mov		startlineFlag,r1
 		tst		r1
 		beq		isrTimerFim
 		add		#1,startlineTimer
 		jmp		isrTimerFim
 isrTeclado:
+	;;testa se startline está ativo
 		mov		startlineFlag,r1
 		tst		r1
 		bne		startlineOn
@@ -161,50 +165,59 @@ isrTeclado:
 		clr		tecdt
 		jmp		isrFim
 startlineOn:
-;;;;;;;;
-		;mov		#slBuf,r5
-		;add		bufferPos,r5z
-;;;;;;;;
+	;;salva em r2 posicao atual do visor
 		mov		#visor,r2
 		add		cursor,r2
+	;;testa se a string chegou ao limite no visor esquerdo
 		cmp		r2,#65524
 		beq		startlineOnFim
+	;;testa se a string chegou ao maximo solicitado na entrada da função startline
 		cmp		cursor,startlineMax
 		beq		startlineOff 
-		add		#1,cursor
+	;;incrementa cursor no visor e testa se usuario digitou a tecla enter
+		add		#1,cursor			
 		cmp		tecdt,#h0d
 		bne		startlineInsere
 	startlineOff:
-		;cmp		tecdt,#8
-		;beq		startlineInsere
+	;;label para desligamento de startline 
+		cmp		tecdt,#8
+		bne		startlineDesliga
+		sub		#1,startlineSize
+		mov		#h20,-1(r2)
+		sub		#1,cursor
+		jmp		startlineOnFim
+		startlineDesliga:
 		mov		#0,startlineFlag
 		jmp		startlineOnFim
 	startlineInsere:
+	;;testa se foi teclado backspace
 		cmp		tecdt,#8
 		bne		startlineInsereChar
-		;char é bsp
+	;;testa se não há nenhum caractere no visor
 		cmp		startlineSize,#0
+	;;caso visor esteja vazio, impede que backspace faça algo
 		bne		sizeNotZero
 		mov		#0,cursor
 		jmp		startlineOnFim
 	sizeNotZero:
+	;;caso visor não esteja vazio, deleta tecla do cursor atual e decrementa cursor
 		sub		#1,startlineSize
 		dec		r2
 		mov		#h20,(r2)
 		sub		#2,cursor
 		jmp		startlineOnFim
 	startlineInsereChar:
+	;;else { insere tecla no visor  }
 		mov		tecdt,(r2)
 		add		#1,startlineSize
-	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;TENTANDO IMPLEMENTAR PARAM_BUFFER
-		;mov		#'p',(r5)
-		;add		#2,bufferPos
 startlineOnFim:
 		clr		tecdt
 		jmp		isrFim
 isrFimNoTecNoTim:
+	;;limpa tecBuffer caso não tenha tecla digitada
 		mov		#0,tecBuffer
 isrFim:	
+	;finaliza interrupcao e recupera através da pilha todos dados dos registradores
 		clr		tecst
 		clr		ints
 		mov		(r6)+,r5	
@@ -213,10 +226,7 @@ isrFim:
 		mov		(r6)+,r2
 		mov		(r6)+,r1
 		mov		(r6)+,r0
-
-		mov 	#h83,inte				;TECLADO E TIMER
-		;mov 	#h82,inte				;TECLADO
-		;mov 	#h81,inte				;TIMER
+		mov 	#h83,inte				;ativa interrupcao de teclado e timer
 
 		rti
 ;		
@@ -224,6 +234,9 @@ isrFim:
 ; WORD	kbhit(void)		
 ;------------------------------------------------------------------------------
 kbhit:
+	;retorno:
+	;r0 = 1 -> não há tecla
+	;r0 = 0 -> há tecla
 		mov		#1,r0
 		tst		tecBuffer
 		beq		kbhitFim
@@ -236,9 +249,11 @@ kbhit:
 ;------------------------------------------------------------------------------
 getchar:
 	getcharLoop:
+	;;enquanto não for digitado alguma tecla não sai desse loop
 		jsr		r7,kbhit
 		tst		r0
 		bne		getcharLoop
+	;;retorna tecla em r0 e limpa buffer da tecla
 		mov		tecBuffer,r0
 		clr		tecBuffer
 		rts		r7
@@ -247,77 +262,76 @@ getchar:
 ; WORD	putchar(WORD area, BYTE caractere)
 ; WORD	putchar(WORD area, BYTE caractere, WORD pos)
 ;------------------------------------------------------------------------------
-putchar:
-	;bsp -> backspace
-	;lf  -> ctrl+enter
-	;ff  -> ctrl+L
-	;cr  -> enter
-			
-			mov		r1,-(r6)
-
-			mov		#visor,r1
-
-		;trata caracteres de controle
-			cmp		r4,#h08 ;bsp
-			beq		bspJmp
-			cmp		r4,#h0d ;cr
-			beq		crJmp
-			cmp		r4,#h0a ;lf
-			beq		lfJmp
-			cmp		r4,#h0c ;ff
-			beq		ffJmp
-			jmp		jmpCaracteresControle
-	bspJmp:
-			tst		cursor
-			beq		putcharFim
-			sub		#1,cursor
-			jmp		putcharFim
-	crJmp:
-			mov		#0,cursor
-			jmp		putcharFim
-	lfJmp:
-			jsr		r7,clrVisorEsq
-			jmp		putcharFim
-	ffJmp:
-			jsr		r7,clrVisorDir
-			jmp		putcharFim
-
+putchar:		
+		mov		r1,-(r6)
+		mov		#visor,r1
+	;;trata caracteres de controle
+		cmp		r4,#h08 ;backspace
+		beq		bspJmp
+		cmp		r4,#h0d ;carriage return
+		beq		crJmp
+		cmp		r4,#h0a ;line feed
+		beq		lfJmp
+		cmp		r4,#h0c ;form feed
+		beq		ffJmp
+		jmp		jmpCaracteresControle
+	bspJmp:	;trata backspace
+	;;decrementa cursor caso não esteja na primeira posição
+		tst		cursor
+		beq		putcharFim
+		sub		#1,cursor
+		jmp		putcharFim
+	crJmp:	;trata carriage return
+	;;posiciona cursor na primeira posicao
+		mov		#0,cursor
+		jmp		putcharFim
+	lfJmp:	;trata line feed
+	;;limpa area esquerad sem alterar cursor
+		jsr		r7,clrVisorEsq
+		jmp		putcharFim
+	ffJmp:	;trata form feed
+	;;limpa area direita
+		jsr		r7,clrVisorDir
+		jmp		putcharFim
 	jmpCaracteresControle:
-		;verifica se caractere esta entre h20 e h7a
-			cmp		r4,#h20
-			blt		putcharFimErro
-			cmp		r4,#h7a
-			bgt		putcharFimErro
-
-			tst		r5
-			beq		areaEsq
-			jmp		areaDir
-
+	;;verifica se caractere esta entre h20 e h7a
+		cmp		r4,#h20
+		blt		putcharFimErro
+		cmp		r4,#h7a
+		bgt		putcharFimErro
+	;;testa se caractere será inserido na area esquerda ou direita
+		tst		r5
+		beq		areaEsq
+		jmp		areaDir
 	areaEsq:
-			cmp		cursor,#24
-			beq		putcharFimErro
-			add		cursor,r1
-			mov		r4,(r1)
-			add		#1,cursor
-			jmp		putcharFim
+	;;testa se area esquerda chegou no limite
+		cmp		cursor,#24
+		beq		putcharFimErro
+	;;insere caractere na posicao do cursor e incrementa cursor
+		add		cursor,r1
+		mov		r4,(r1)
+		add		#1,cursor
+		jmp		putcharFim
 	areaDir:
-			cmp		r3,#0
-			blt		putcharFimErro
-			cmp		r3,#11
-			bgt		putcharFimErro
-			add		#24,r1
-			add		r3,r1
-			mov		r4,(r1)
-			add		#1,r3
-			jmp		putcharFim
-
+	;;testa se posicao da area direita está correta
+		cmp		r3,#0
+		blt		putcharFimErro
+		cmp		r3,#11
+		bgt		putcharFimErro
+	;;posiciona cursor na area direita e insere caractere
+		add		#24,r1
+		add		r3,r1
+		mov		r4,(r1)
+		add		#1,r3
+		jmp		putcharFim
 	putcharFimErro:
-			mov		#1,r0
+	;;retorna 1 em r0 caso haja algum erro
+		mov		#1,r0
 	putcharFim:
-			mov		#0,r0
-			mov		(r6)+,r1
-			rts		r7
-
+	;;retorna 0 em r0 caso não haja erro
+		mov		#0,r0
+		mov		(r6)+,r1
+		rts		r7
 ;		
 ;------------------------------------------------------------------------------
 ; WORD	putmsg(WORD area, BYTE *msg)
@@ -325,19 +339,22 @@ putchar:
 ;------------------------------------------------------------------------------
 putmsg:
 		mov		r1,-(r6)
+	;;move ponteiro da string msg para r1 e decrementa
 		mov		r4,r1
 		dec		r1
-
 	putmsgLoop:
+	;;move caractere atual da string para registrador de entrada do putchar
 		mov		(r1),r4
+	;;incrementa posicao do vetor msg
 		inc		r1
+	;;imprime novo caractere caso caractere seja diferente de zero
 		and		#hff,r4
 		cmp		r4,#0
 		beq		putmsgFim
 		jsr		r7,putchar
 		jmp		putmsgLoop
-
 	putmsgFim:
+	;;encerra putmsg
 		mov		(r6)+,r1
 		rts		r7
 ;
@@ -345,11 +362,10 @@ putmsg:
 ; WORD	startline(BYTE *buffer, WORD max)
 ;------------------------------------------------------------------------------
 startline:
-		mov		r4,startlineMax		
+		mov		r4,startlineMax		;tamanho maximo solicitado na string digitada durante startline
 		mov		#1,startlineFlag	;ativa startline
-
-		mov		#0,startlineSize
-
+		mov		#0,startlineSize	;zera tamanho da string de startline
+		mov		#0,startlineTimer	;reseta timer
 		rts		r7
 ;		
 ;------------------------------------------------------------------------------
@@ -358,7 +374,6 @@ startline:
 getline:
 		mov		r1,-(r6)
 		mov		r2,-(r6)
-
 	;;r5 == param_reset ?
 		cmp		r5,#0				
 		bne		getlineJmp1
@@ -367,7 +382,6 @@ getline:
 		beq		getlineErro
 		mov		#0,startlineFlag
 		jmp		getlineFim
-
 	getlineJmp1:
 	;;r5 == param_finished ?
 		cmp		r5,#1				
@@ -375,13 +389,6 @@ getline:
 		cmp		startlineFlag,#0
 		beq		getlineFim
 		jmp		getlineErro
-
-		;mov		cursor,r2
-		;cmp		r2,startlineMax
-		;beq		getlineFim			;jmp se string chegou a max
-		;cmp		startlineFlag,#0
-		;beq		getlineFim			;jmp se caractere é igual a H0D (enter)
-		;jmp		getlineErro
 	getlineJmp2:
 	;;r5 == param_time ?
 		cmp		r5,#2	
@@ -391,15 +398,14 @@ getline:
 		mov		(r6)+,r1
 		rts		r7
 	getlineJmp3:
-	;;r5 == param_buffer ?
+	;;r5 == param_buffer ? [não implementado]
 		cmp		r5,#3	
 		bne		getlineJmp4
-		mov		#slBuf,r0
 		mov		(r6)+,r2
 		mov		(r6)+,r1
 		rts		r7
 	getlineJmp4:
-	;;r5 == param_size
+	;;r5 == param_size ?
 		cmp		r5,#4
 		bne		getlineErro
 		mov		startlineSize,r0
@@ -407,18 +413,23 @@ getline:
 		mov		(r6)+,r1
 		rts		r7
 	getlineErro:
+	;;retorno de erro
 		mov		(r6)+,r2
 		mov		(r6)+,r1
 		mov		#65535,r0
 		rts		r7
 	getlineFim:
-		;mov	#0,startlineFlag
+	;;retorno de param_reset e param_finished
 		mov		(r6)+,r2
 		mov		(r6)+,r1
 		mov		#0,r0
 		rts		r7
-;#############################################################################
+;		
+;------------------------------------------------------------------------------
+; void	clrVisorEsq()
+;------------------------------------------------------------------------------
 clrVisorEsq:
+	;;limpa visor na area esquerda
 		mov		' ',65500
 		mov		' ',65501
 		mov		' ',65502
@@ -444,8 +455,12 @@ clrVisorEsq:
 		mov		' ',65522
 		mov		' ',65523
 		rts 	r7
-;#############################################################################
+;		
+;------------------------------------------------------------------------------
+; void	clrVisorDir()
+;------------------------------------------------------------------------------
 clrVisorDir:
+	;;limpa visor na area direita
 		mov		' ',65524
 		mov		' ',65525
 		mov		' ',65526
@@ -459,14 +474,4 @@ clrVisorDir:
 		mov		' ',65534
 		mov		' ',65535
 		rts 	r7
-;#############################################################################
-Wait:
-		mov		#10,r0
-	WaitLoopR0:
-		mov		#30000,r1
-	WaitLoopR1:
-		sob		r1,WaitLoopR1
-		sob		r0,WaitLoopR0
-		rts		r7
-;#############################################################################
 
